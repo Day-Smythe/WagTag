@@ -1,9 +1,25 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>WagTag</title>
-    </head>
-    <body>
-        <p>This is a Fursona ID'er database, Feel free to add your fursona to the database (In Heavy Development).</p>
-    </body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Heat Map</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Reading Heat Map</h1>
+        <div class="controls">
+            <button id="loadData">Load Data</button>
+            <div class="legend">
+                <span>Low</span>
+                <div class="gradient"></div>
+                <span>High</span>
+            </div>
+        </div>
+        <div id="heatmap" class="heatmap-container"></div>
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
 </html>

@@ -3,23 +3,415 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reading Heat Map</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Time Series Heat Map</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .description {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .date-range {
+            font-weight: 600;
+            color: #3498db;
+            background: #e1f0fa;
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .heatmap-container {
+            display: grid;
+            gap: 2px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .cell {
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(0, 0, 0, 0.6);
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .legend {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 25px;
+            gap: 15px;
+        }
+        
+        .gradient {
+            width: 300px;
+            height: 25px;
+            background: linear-gradient(to right, #313695, #4575b4, #74add1, #abd9e9, #e0f3f8, #ffffbf, #fee090, #fdae61, #f46d43, #d73027, #a50026);
+            border-radius: 5px;
+        }
+        
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 300px;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+        
+        .tooltip.visible {
+            opacity: 1;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        
+        .days-axis {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .day-label {
+            text-align: center;
+            padding: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .hour-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .chart-wrapper {
+            display: flex;
+        }
+        
+        .hours-axis {
+            display: grid;
+            grid-template-rows: repeat(24, 1fr);
+            gap: 2px;
+            margin-right: 5px;
+        }
+        
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(24, 1fr);
+            gap: 2px;
+            flex-grow: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .gradient {
+                width: 250px;
+            }
+            
+            .legend-labels {
+                width: 250px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Reading Heat Map</h1>
+        <h1>Time Series Heat Map</h1>
+        <p class="description">Visualization of data values over the last 7 days (by hour)</p>
+        
         <div class="controls">
-            <button id="loadData">Load Data</button>
-            <div class="legend">
-                <span>Low</span>
-                <div class="gradient"></div>
-                <span>High</span>
+            <div class="date-range">Displaying: Last 7 days</div>
+            <button id="loadData">Reload Data</button>
+        </div>
+        
+        <div class="chart-wrapper">
+            <div class="hours-axis">
+                <div class="day-label">Hour</div>
+                <!-- Hour labels will be inserted here by JavaScript -->
+            </div>
+            
+            <div>
+                <div class="days-axis">
+                    <div></div>
+                    <!-- Day labels will be inserted here by JavaScript -->
+                </div>
+                
+                <div class="heatmap-container">
+                    <div class="heatmap-grid">
+                        <!-- Heatmap cells will be inserted here by JavaScript -->
+                    </div>
+                </div>
             </div>
         </div>
-        <div id="heatmap" class="heatmap-container"></div>
+        
+        <div class="legend">
+            <div>
+                <div class="gradient"></div>
+                <div class="legend-labels">
+                    <span>Low</span>
+                    <span>Medium</span>
+                    <span>High</span>
+                </div>
+            </div>
+        </div>
+        
         <div id="tooltip" class="tooltip"></div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const heatmap = new HeatMap();
+            heatmap.loadData();
+            
+            document.getElementById('loadData').addEventListener('click', function() {
+                heatmap.loadData();
+            });
+        });
+
+        class HeatMap {
+            constructor() {
+                this.tooltip = document.getElementById('tooltip');
+                this.heatmapGrid = document.querySelector('.heatmap-grid');
+                this.daysAxis = document.querySelector('.days-axis');
+                this.hoursAxis = document.querySelector('.hours-axis');
+                this.dateRangeElement = document.querySelector('.date-range');
+            }
+
+            async loadData() {
+                try {
+                    this.showLoading();
+                    
+                    // In a real scenario, you would fetch from a CSV file
+                    // const response = await fetch('data.csv');
+                    // const csvData = await response.text();
+                    // const data = this.parseCSV(csvData);
+                    
+                    // For demonstration, we'll generate sample data
+                    const data = this.generateSampleData();
+                    
+                    this.renderHeatmap(data);
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showError();
+                }
+            }
+
+            generateSampleData() {
+                const data = [];
+                const now = new Date();
+                
+                // Generate data for the last 7 days
+                for (let day = 6; day >= 0; day--) {
+                    const date = new Date(now);
+                    date.setDate(date.getDate() - day);
+                    
+                    for (let hour = 0; hour < 24; hour++) {
+                        // Generate random data values
+                        const value = Math.floor(Math.random() * 100);
+                        
+                        data.push({
+                            date: date.toISOString().split('T')[0],
+                            hour: hour,
+                            value: value
+                        });
+                    }
+                }
+                
+                return data;
+            }
+
+            parseCSV(csvText) {
+                const lines = csvText.split('\n');
+                const data = [];
+                
+                // Skip header row and parse each line
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line) {
+                        const [date, hour, value] = line.split(',');
+                        data.push({
+                            date: date,
+                            hour: parseInt(hour),
+                            value: parseInt(value)
+                        });
+                    }
+                }
+                
+                return data;
+            }
+
+            renderHeatmap(data) {
+                // Clear previous content
+                this.heatmapGrid.innerHTML = '';
+                this.daysAxis.innerHTML = '<div></div>';
+                this.hoursAxis.innerHTML = '<div class="day-label">Hour</div>';
+                
+                // Get the date range for display
+                const dates = [...new Set(data.map(item => item.date))].sort();
+                const startDate = dates[0];
+                const endDate = dates[dates.length - 1];
+                this.dateRangeElement.textContent = `Displaying: ${startDate} to ${endDate}`;
+                
+                // Create day labels (Sun, Mon, etc.)
+                const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                dates.forEach(dateStr => {
+                    const date = new Date(dateStr);
+                    const dayLabel = document.createElement('div');
+                    dayLabel.className = 'day-label';
+                    dayLabel.textContent = dayOfWeek[date.getDay()];
+                    this.daysAxis.appendChild(dayLabel);
+                });
+                
+                // Create hour labels
+                for (let hour = 0; hour < 24; hour++) {
+                    const hourLabel = document.createElement('div');
+                    hourLabel.className = 'hour-label';
+                    hourLabel.textContent = `${hour}:00`;
+                    this.hoursAxis.appendChild(hourLabel);
+                }
+                
+                // Find min and max values for color scaling
+                const values = data.map(item => item.value);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                
+                // Create heatmap cells
+                for (let hour = 0; hour < 24; hour++) {
+                    for (let dayIndex = 0; dayIndex < dates.length; dayIndex++) {
+                        const date = dates[dayIndex];
+                        const cellData = data.find(item => item.date === date && item.hour === hour);
+                        const value = cellData ? cellData.value : 0;
+                        
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.style.backgroundColor = this.getColor(value, min, max);
+                        cell.textContent = value;
+                        
+                        cell.addEventListener('mouseenter', (e) => {
+                            this.tooltip.innerHTML = `
+                                Date: ${date}<br>
+                                Hour: ${hour}:00<br>
+                                Value: <b>${value}</b>
+                            `;
+                            this.tooltip.classList.add('visible');
+                        });
+                        
+                        cell.addEventListener('mousemove', (e) => {
+                            this.tooltip.style.left = (e.pageX + 10) + 'px';
+                            this.tooltip.style.top = (e.pageY + 10) + 'px';
+                        });
+                        
+                        cell.addEventListener('mouseleave', () => {
+                            this.tooltip.classList.remove('visible');
+                        });
+                        
+                        this.heatmapGrid.appendChild(cell);
+                    }
+                }
+            }
+
+            getColor(value, min, max) {
+                // Normalize value between 0 and 1
+                const normalized = (value - min) / (max - min);
+                
+                // Use a color gradient from blue to red
+                const hue = (1 - normalized) * 240; // 240° is blue, 0° is red
+                return `hsl(${hue}, 100%, 50%)`;
+            }
+
+            showLoading() {
+                this.heatmapGrid.innerHTML = '<div class="loading">Loading data...</div>';
+            }
+
+            showError() {
+                this.heatmapGrid.innerHTML = '<div class="loading">Error loading data. Please check if data.csv exists.</div>';
+            }
+        }
+    </script>
 </body>
 </html>

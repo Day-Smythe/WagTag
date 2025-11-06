@@ -1,5 +1,3 @@
-Here you can say lots of fun things about your site.
+A (hopefuly weekly) news paper on animals and the good they bring to this world
 
-Maybe say a some things about yourself.
-
-Or maybe what you plan to blog about.
+Written, maintaned and curated by Damian Smythe

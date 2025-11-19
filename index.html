@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topographic Map with Elevation-Based Circle Plotting</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            width: 300px;
+        }
+        
+        .control-panel h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 10px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="control-panel">
+        <h3>Plot Circle by Coordinates</h3>
+        <div class="form-group">
+            <label for="latitude">Latitude:</label>
+            <input type="number" id="latitude" step="any" placeholder="e.g., 0 for equator">
+        </div>
+        <div class="form-group">
+            <label for="longitude">Longitude:</label>
+            <input type="number" id="longitude" step="any" placeholder="e.g., -60 for 60°W">
+        </div>
+        <div class="form-group">
+            <label for="altitude">Altitude (meters):</label>
+            <input type="number" id="altitude" step="any" placeholder="e.g., 100">
+        </div>
+        <div class="form-group">
+            <label for="radius">Radius (km):</label>
+            <input type="number" id="radius" step="any" placeholder="e.g., 10">
+        </div>
+        <button id="plot-btn">Plot Circle</button>
+        <button id="clear-btn">Clear Circles</button>
+        <div class="info">
+            <p>Circle will stop expanding where terrain is 20m+ higher than entered altitude.</p>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialize the map with the specified bounds
+        const map = L.map('map').setView([-25, -10], 4);
+        
+        // Add OpenTopoMap layer
+        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+        }).addTo(map);
+        
+        // Set the map bounds: 60°W at equator to 40°E at 50°S
+        const southWest = L.latLng(-50, -60);
+        const northEast = L.latLng(0, 40);
+        const bounds = L.latLngBounds(southWest, northEast);
+        map.setMaxBounds(bounds);
+        map.fitBounds(bounds);
+        
+        // Store circle markers
+        let circles = [];
+        
+        // Function to get elevation data (simulated for this example)
+        // In a real implementation, you would use a service like OpenElevation API
+        function getElevation(lat, lng) {
+            // This is a simplified simulation - in reality you would call an elevation API
+            // For demonstration, we'll return a value that increases with distance from equator
+            return Math.abs(lat) * 100 + Math.random() * 50;
+        }
+        
+        // Function to plot the circle with elevation constraints
+        function plotCircle() {
+            // Get input values
+            const lat = parseFloat(document.getElementById('latitude').value);
+            const lng = parseFloat(document.getElementById('longitude').value);
+            const altitude = parseFloat(document.getElementById('altitude').value);
+            const radiusKm = parseFloat(document.getElementById('radius').value);
+            
+            // Validate inputs
+            if (isNaN(lat) || isNaN(lng) || isNaN(altitude) || isNaN(radiusKm)) {
+                alert('Please enter valid numbers for all fields');
+                return;
+            }
+            
+            // Convert radius from km to meters
+            const radiusM = radiusKm * 1000;
+            
+            // Create the center marker
+            const center = L.latLng(lat, lng);
+            const centerMarker = L.circleMarker(center, {
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.5,
+                radius: 8
+            }).addTo(map);
+            
+            circles.push(centerMarker);
+            
+            // Create the constrained circle
+            const constrainedCircle = createConstrainedCircle(center, radiusM, altitude);
+            circles.push(constrainedCircle);
+            
+            // Fit map to show the circle
+            map.fitBounds(constrainedCircle.getBounds());
+        }
+        
+        // Function to create a circle that stops where elevation exceeds threshold
+        function createConstrainedCircle(center, radiusM, baseAltitude) {
+            const thresholdAltitude = baseAltitude + 20; // 20m higher than entered altitude
+            
+            // Create a polygon with points around the center
+            // For simplicity, we'll create a circle with 36 points (every 10 degrees)
+            const points = [];
+            const numPoints = 36;
+            
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (i / numPoints) * 2 * Math.PI;
+                
+                // Calculate the point at full radius
+                const dx = radiusM * Math.cos(angle);
+                const dy = radiusM * Math.sin(angle);
+                
+                // Convert meters to latitude/longitude (approximate)
+                const latOffset = dy / 111320; // meters per degree of latitude
+                const lngOffset = dx / (111320 * Math.cos(center.lat * Math.PI / 180)); // meters per degree of longitude
+                
+                const testLat = center.lat + latOffset;
+                const testLng = center.lng + lngOffset;
+                
+                // Get elevation at this point
+                const elevation = getElevation(testLat, testLng);
+                
+                // If elevation exceeds threshold, reduce the radius
+                let actualLat, actualLng;
+                if (elevation > thresholdAltitude) {
+                    // Find the point where elevation equals threshold
+                    // For simplicity, we'll reduce radius by a fixed percentage
+                    const reducedRadius = radiusM * 0.7;
+                    const reducedDx = reducedRadius * Math.cos(angle);
+                    const reducedDy = reducedRadius * Math.sin(angle);
+                    
+                    const reducedLatOffset = reducedDy / 111320;
+                    const reducedLngOffset = reducedDx / (111320 * Math.cos(center.lat * Math.PI / 180));
+                    
+                    actualLat = center.lat + reducedLatOffset;
+                    actualLng = center.lng + reducedLngOffset;
+                } else {
+                    // Use the full radius point
+                    actualLat = testLat;
+                    actualLng = testLng;
+                }
+                
+                points.push([actualLat, actualLng]);
+            }
+            
+            // Close the polygon
+            points.push(points[0]);
+            
+            // Create and return the polygon
+            return L.polygon(points, {
+                color: 'blue',
+                fillColor: '#3388ff',
+                fillOpacity: 0.2,
+                weight: 2
+            }).addTo(map);
+        }
+        
+        // Function to clear all circles
+        function clearCircles() {
+            circles.forEach(circle => map.removeLayer(circle));
+            circles = [];
+        }
+        
+        // Event listeners
+        document.getElementById('plot-btn').addEventListener('click', plotCircle);
+        document.getElementById('clear-btn').addEventListener('click', clearCircles);
+    </script>
+</body>
+</html>

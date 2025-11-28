@@ -51,7 +51,9 @@ section.grid-cont-1-m-1{
     grid-template-columns: repeat(1fr, 7);
     grid-template-areas: "day-mo  day-tu  day-we  day-th  day-fr  day-sa  day-su ";
 }
-.calendar-table, .calendar-weekdays, .calendar-cover, {
+.calendar-table,
+.calendar-weekdays,
+.calendar-cover {
     align-items: center;
 }
 .calendar-table p { 
